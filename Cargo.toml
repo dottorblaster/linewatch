@@ -8,7 +8,12 @@ license = "Apache-2.0"
 anyhow = "1.0.103"
 clap = { version = "4.6.1", features = ["derive"] }
 figment = { version = "0.10.19", features = ["toml", "env"] }
+hickory-resolver = "0.26.1"
+rand = "0.10.2"
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls"] }
 serde = { version = "1.0.228", features = ["derive"] }
+socket2 = "0.6.4"
+surge-ping = "0.9.0"
 thiserror = "2.0.18"
 time = { version = "0.3.53", features = ["serde", "formatting", "macros"] }
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "signal", "time"] }
