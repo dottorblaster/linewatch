@@ -1,5 +1,5 @@
-use figment::providers::{Env, Format, Toml};
 use figment::Figment;
+use figment::providers::{Env, Format, Toml};
 use serde::Deserialize;
 use std::path::PathBuf;
 

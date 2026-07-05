@@ -88,12 +88,15 @@ impl Machine {
         cfg: &DebounceCfg,
     ) -> Option<OutageEvent> {
         // Take ownership of the old state so we can mutate self freely.
-        let old_state = std::mem::replace(&mut self.state, MachineState::Idle {
-            bad_count: 0,
-            streak_started: OffsetDateTime::UNIX_EPOCH,
-            streak_worst: Status::Ok,
-            streak_min_temp: None,
-        });
+        let old_state = std::mem::replace(
+            &mut self.state,
+            MachineState::Idle {
+                bad_count: 0,
+                streak_started: OffsetDateTime::UNIX_EPOCH,
+                streak_worst: Status::Ok,
+                streak_min_temp: None,
+            },
+        );
 
         match old_state {
             MachineState::Idle {
@@ -239,8 +242,8 @@ fn category(s: &Status) -> AgcomCategory {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::types::Status;
+    use super::*;
     use time::macros::datetime;
 
     fn cfg(open: u32, close: u32) -> DebounceCfg {
@@ -306,8 +309,14 @@ mod tests {
         // 4 downs, 4 more downs, then 2 oks
         let events = run(
             &[
-                Status::Down, Status::Down, Status::Down, Status::Down, // opens at #3 (0-indexed)
-                Status::Down, Status::Down, Status::Down, Status::Down,
+                Status::Down,
+                Status::Down,
+                Status::Down,
+                Status::Down, // opens at #3 (0-indexed)
+                Status::Down,
+                Status::Down,
+                Status::Down,
+                Status::Down,
                 Status::Ok,
                 Status::Ok, // closes
             ],
@@ -387,16 +396,22 @@ mod tests {
         let mut m = Machine::new();
         let cfg = cfg(3, 2);
         let times = [
-            ts(0, 0, 0), ts(0, 0, 1), ts(0, 0, 2), // 3 downs → opens
+            ts(0, 0, 0),
+            ts(0, 0, 1),
+            ts(0, 0, 2), // 3 downs → opens
             ts(0, 0, 3), // 1st Ok (close_count=1)
             ts(0, 0, 4), // Down resets close_count to 0
-            ts(0, 0, 5), ts(0, 0, 6), // 2 Oks → closes
+            ts(0, 0, 5),
+            ts(0, 0, 6), // 2 Oks → closes
         ];
         let statuses = [
-            Status::Down, Status::Down, Status::Down,
+            Status::Down,
+            Status::Down,
+            Status::Down,
             Status::Ok,
             Status::Down,
-            Status::Ok, Status::Ok,
+            Status::Ok,
+            Status::Ok,
         ];
         let mut events = Vec::new();
         for (t, s) in times.iter().zip(statuses.iter()) {
@@ -418,10 +433,16 @@ mod tests {
     fn two_separate_events() {
         let events = run(
             &[
-                Status::Down, Status::Down, Status::Down, // open
-                Status::Ok, Status::Ok, // close event 1
-                Status::Degraded, Status::Degraded, Status::Degraded, // open
-                Status::Ok, Status::Ok, // close event 2
+                Status::Down,
+                Status::Down,
+                Status::Down, // open
+                Status::Ok,
+                Status::Ok, // close event 1
+                Status::Degraded,
+                Status::Degraded,
+                Status::Degraded, // open
+                Status::Ok,
+                Status::Ok, // close event 2
             ],
             3,
             2,

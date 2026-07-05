@@ -22,9 +22,7 @@ pub fn classify(sample: &Sample, t: &Thresholds) -> Status {
     let anchors: Vec<&ProbeOutcome> = sample
         .outcomes
         .iter()
-        .filter(|o| {
-            o.kind == TargetKind::IcmpAnchor || o.kind == TargetKind::TcpAnchor
-        })
+        .filter(|o| o.kind == TargetKind::IcmpAnchor || o.kind == TargetKind::TcpAnchor)
         .collect();
 
     if !anchors.is_empty() && anchors.iter().all(|o| !o.reachable) {
@@ -67,8 +65,8 @@ pub fn classify(sample: &Sample, t: &Thresholds) -> Status {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use time::macros::datetime;
     use std::time::Duration;
+    use time::macros::datetime;
 
     fn default_thresholds() -> Thresholds {
         Thresholds {
