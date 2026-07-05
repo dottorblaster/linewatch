@@ -25,6 +25,6 @@ sha2 = "0.11.0"
 socket2 = "0.6.4"
 surge-ping = "0.9.0"
 thiserror = "2.0.18"
-time = { version = "0.3.53", features = ["serde", "formatting", "macros"] }
+time = { version = "0.3.53", features = ["serde", "formatting", "macros", "parsing"] }
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "signal", "time", "fs"] }
 toml = "1.1.2"
