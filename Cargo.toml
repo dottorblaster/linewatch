@@ -1,0 +1,14 @@
+[package]
+name = "linewatch"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.103"
+clap = { version = "4.6.1", features = ["derive"] }
+figment = { version = "0.10.19", features = ["toml", "env"] }
+serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.18"
+time = { version = "0.3.53", features = ["serde", "formatting", "macros"] }
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "signal", "time"] }
+toml = "1.1.2"
