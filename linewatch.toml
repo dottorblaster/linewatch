@@ -20,7 +20,7 @@ close_after = 3
 source = "open-meteo"
 lat = 41.77
 lon = 12.66
-static_c = null
+# static_c = 22.0
 
 # Optional OTLP endpoint for exporting metrics via OpenTelemetry.
 # When unset (the default), no OTLP code path runs.

@@ -12,5 +12,12 @@ pub enum Command {
     /// Run the monitoring daemon
     Run,
     /// Report on collected data
-    Report,
+    Report {
+        /// Output format: md or txt
+        #[arg(short, long, default_value = "md")]
+        format: String,
+        /// Path to optional chart image for embedding in the report
+        #[arg(short, long)]
+        chart: Option<String>,
+    },
 }

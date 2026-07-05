@@ -4,4 +4,5 @@ pub mod chain;
 pub mod classify;
 pub mod dossier;
 pub mod events;
+pub mod render_md;
 pub mod types;
