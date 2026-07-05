@@ -8,7 +8,7 @@
 use std::io;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::os::unix::io::IntoRawFd;
 use std::time::{Duration, Instant};
 
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
@@ -17,7 +17,7 @@ use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 // Hop type
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Hop {
     pub ttl: u8,
     pub addr: Option<IpAddr>,
@@ -270,7 +270,7 @@ async fn tcp_ttl_trace(
 
 /// Try to connect to `target:443` with the given IP TTL.
 async fn tcp_probe_ttl(target: IpAddr, ttl: u8, per_hop_timeout: Duration) -> io::Result<()> {
-    use std::os::unix::io::{FromRawFd, IntoRawFd};
+    use std::os::unix::io::FromRawFd;
 
     // Create a socket2 Socket so we can set TTL and non-blocking.
     let sock = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
