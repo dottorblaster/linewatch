@@ -15,11 +15,7 @@ use crate::core::types::{ProbeOutcome, TargetKind};
 // ---------------------------------------------------------------------------
 
 /// Connect to `host:port` via TCP and measure handshake latency.
-pub async fn tcp_connect(
-    kind: TargetKind,
-    addr: &str,
-    timeout_dur: Duration,
-) -> ProbeOutcome {
+pub async fn tcp_connect(kind: TargetKind, addr: &str, timeout_dur: Duration) -> ProbeOutcome {
     let start = tokio::time::Instant::now();
     let result = timeout(timeout_dur, TcpStream::connect(addr)).await;
     let elapsed = start.elapsed();
@@ -45,11 +41,7 @@ pub async fn tcp_connect(
 // ---------------------------------------------------------------------------
 
 /// Perform a GET request and check for a 2xx (or 204) status code.
-pub async fn http_check(
-    kind: TargetKind,
-    url: &str,
-    timeout_dur: Duration,
-) -> ProbeOutcome {
+pub async fn http_check(kind: TargetKind, url: &str, timeout_dur: Duration) -> ProbeOutcome {
     let client = reqwest::Client::builder()
         .timeout(timeout_dur)
         .redirect(reqwest::redirect::Policy::none())
@@ -110,25 +102,24 @@ pub async fn dns_check(
         }
     };
 
+    use hickory_resolver::TokioResolver;
     use hickory_resolver::config::{ConnectionConfig, NameServerConfig, ResolverConfig};
     use hickory_resolver::net::runtime::TokioRuntimeProvider;
-    use hickory_resolver::TokioResolver;
 
     let ns = NameServerConfig::new(sock_addr.ip(), true, vec![ConnectionConfig::udp()]);
     let config = ResolverConfig::from_parts(None, vec![], vec![ns]);
-    let resolver = match TokioResolver::builder_with_config(config, TokioRuntimeProvider::default())
-        .build()
-    {
-        Ok(r) => r,
-        Err(_) => {
-            return ProbeOutcome {
-                kind,
-                reachable: false,
-                rtt: None,
-                loss_pct: 100,
-            };
-        }
-    };
+    let resolver =
+        match TokioResolver::builder_with_config(config, TokioRuntimeProvider::default()).build() {
+            Ok(r) => r,
+            Err(_) => {
+                return ProbeOutcome {
+                    kind,
+                    reachable: false,
+                    rtt: None,
+                    loss_pct: 100,
+                };
+            }
+        };
 
     let start = tokio::time::Instant::now();
     let result = timeout(timeout_dur, resolver.lookup_ip(name)).await;
@@ -194,11 +185,7 @@ pub async fn default_gateway() -> Option<Ipv4Addr> {
 /// (`SOCK_RAW`).  When neither is available the function logs a warning via
 /// `eprintln!` and returns `reachable = false` with 100 % loss — it never
 /// panics.
-pub async fn icmp_ping(
-    kind: TargetKind,
-    addr: Ipv4Addr,
-    timeout_dur: Duration,
-) -> ProbeOutcome {
+pub async fn icmp_ping(kind: TargetKind, addr: Ipv4Addr, timeout_dur: Duration) -> ProbeOutcome {
     use socket2::Type;
     use surge_ping::{Client, Config, ICMP};
 
@@ -322,13 +309,7 @@ mod tests {
 
     #[tokio::test]
     async fn live_dns_check() {
-        let o = dns_check(
-            probe_kind("dns"),
-            "1.1.1.1:53",
-            "cloudflare.com",
-            TIMEOUT,
-        )
-        .await;
+        let o = dns_check(probe_kind("dns"), "1.1.1.1:53", "cloudflare.com", TIMEOUT).await;
         println!(
             "DNS cloudflare.com @1.1.1.1  reachable={}  rtt={:?}",
             o.reachable, o.rtt
