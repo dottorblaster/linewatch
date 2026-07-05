@@ -57,6 +57,7 @@ pub struct Config {
     pub thresholds: Thresholds,
     pub debounce: DebounceCfg,
     pub temp: TempCfg,
+    pub otlp_endpoint: Option<String>,
 }
 
 impl Config {
