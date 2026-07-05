@@ -15,7 +15,7 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Command::Run => {
-            println!("run: not implemented");
+            shell::run::run(_config).await?;
         }
         Command::Report => {
             println!("report: not implemented");

@@ -7,7 +7,7 @@
 
 use std::io;
 use std::mem;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 use std::os::unix::io::IntoRawFd;
 use std::time::{Duration, Instant};
 

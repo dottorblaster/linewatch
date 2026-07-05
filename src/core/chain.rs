@@ -5,7 +5,7 @@
 //! [`verify_chain`] replays the chain and reports the first break.
 
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 

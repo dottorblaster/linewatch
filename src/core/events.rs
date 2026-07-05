@@ -193,6 +193,43 @@ impl Machine {
             }
         }
     }
+
+    /// Force-close any in-flight event (used during graceful shutdown).
+    pub fn force_close(&mut self, ts: OffsetDateTime) -> Option<OutageEvent> {
+        let old_state = std::mem::replace(
+            &mut self.state,
+            MachineState::Idle {
+                bad_count: 0,
+                streak_started: OffsetDateTime::UNIX_EPOCH,
+                streak_worst: Status::Ok,
+                streak_min_temp: None,
+            },
+        );
+
+        match old_state {
+            MachineState::Open {
+                started,
+                worst_status,
+                min_temp_c,
+                samples_count,
+                ..
+            } => {
+                let cat = category(&worst_status);
+                Some(OutageEvent {
+                    started,
+                    ended: Some(ts),
+                    worst_status,
+                    min_temp_c,
+                    samples_count,
+                    category: cat,
+                })
+            }
+            other => {
+                self.state = other;
+                None
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
