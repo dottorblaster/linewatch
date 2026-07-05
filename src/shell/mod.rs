@@ -2,3 +2,4 @@
 
 pub mod probe;
 pub mod temp;
+pub mod trace;
