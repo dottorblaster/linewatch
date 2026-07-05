@@ -11,6 +11,7 @@ axum = "0.8.9"
 clap = { version = "4.6.1", features = ["derive"] }
 figment = { version = "0.10.19", features = ["toml", "env"] }
 futures = "0.3.32"
+genpdf = { version = "0.2.0", features = ["images"] }
 hex = "0.4.3"
 hickory-resolver = "0.26.1"
 opentelemetry = { version = "0.32.0", features = ["metrics"] }

@@ -58,8 +58,15 @@ async fn main() -> Result<()> {
                     let md = core::render_md::render_markdown(&dossier, &records, &report_cfg);
                     println!("{}", md);
                 }
+                "pdf" => {
+                    let chart_path = chart.as_ref().map(|s| std::path::Path::new(s));
+                    let output = config.data_dir.join("dossier.pdf");
+                    shell::render_pdf::render_pdf(&dossier, &records, chart_path, &output)
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                    println!("PDF written to {:?}", output);
+                }
                 other => {
-                    anyhow::bail!("unsupported format: {other} (expected 'md')");
+                    anyhow::bail!("unsupported format: {other} (expected 'md' or 'pdf')");
                 }
             }
         }
