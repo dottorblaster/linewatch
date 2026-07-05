@@ -5,7 +5,7 @@ use time::OffsetDateTime;
 // Public types
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AgcomCategory {
     /// At least one Down sample was observed.
     CompleteInterruption,
@@ -13,7 +13,7 @@ pub enum AgcomCategory {
     IrregularService,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OutageEvent {
     pub started: OffsetDateTime,
     pub ended: Option<OffsetDateTime>,

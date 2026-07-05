@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TargetKind {
     Gateway,
     IcmpAnchor,
@@ -9,7 +9,7 @@ pub enum TargetKind {
     Http,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ProbeOutcome {
     pub kind: TargetKind,
     pub reachable: bool,
@@ -17,14 +17,14 @@ pub struct ProbeOutcome {
     pub loss_pct: u8,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Sample {
     pub ts: time::OffsetDateTime,
     pub temp_c: Option<f64>,
     pub outcomes: Vec<ProbeOutcome>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Status {
     Ok,
     Degraded,
