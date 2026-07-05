@@ -1,5 +1,6 @@
 // Shell module — I/O, sockets, files, clock, signals
 
+pub mod chart;
 pub mod metrics;
 pub mod otlp;
 pub mod probe;
