@@ -8,7 +8,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 
-use crate::core::chain::{compute_hash, Record, RecordChain};
+use crate::core::chain::{Record, RecordChain, compute_hash};
 
 // ---------------------------------------------------------------------------
 // StoreWriter
@@ -34,7 +34,11 @@ impl StoreWriter {
         // Recover chain state from the last existing line.
         let (seq, prev_hash) = read_last_line(&path)?;
 
-        let mut writer = StoreWriter { file, seq, prev_hash };
+        let mut writer = StoreWriter {
+            file,
+            seq,
+            prev_hash,
+        };
 
         // Append a MonitorRestart record.
         let restart = Record::MonitorRestart {
@@ -190,7 +194,7 @@ mod tests {
         for _ in 0..3 {
             let rec = Record::MonitorRestart {
                 chain: RecordChain {
-                    seq: 0,       // will be replaced
+                    seq: 0, // will be replaced
                     prev_hash: String::new(),
                     hash: String::new(),
                 },
@@ -202,7 +206,10 @@ mod tests {
 
         // Read back and verify.
         let mut contents = String::new();
-        File::open(&path).unwrap().read_to_string(&mut contents).unwrap();
+        File::open(&path)
+            .unwrap()
+            .read_to_string(&mut contents)
+            .unwrap();
         let lines: Vec<serde_json::Value> = contents
             .lines()
             .filter(|l| !l.trim().is_empty())
@@ -218,8 +225,14 @@ mod tests {
     #[test]
     fn tamper_detected_on_reload() {
         let dir = std::env::temp_dir();
-        let unique = format!("linewatch_tamper_{}_{}", std::process::id(), std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos());
+        let unique = format!(
+            "linewatch_tamper_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        );
         let path = dir.join(unique);
 
         {
@@ -236,13 +249,19 @@ mod tests {
 
         // Tamper with the file on disk.
         let mut contents = String::new();
-        File::open(&path).unwrap().read_to_string(&mut contents).unwrap();
+        File::open(&path)
+            .unwrap()
+            .read_to_string(&mut contents)
+            .unwrap();
         let tampered = contents.replacen("monitor_restart", "xoinitor_restart", 1);
         std::fs::write(&path, tampered).unwrap();
 
         // Read back and verify.
         let mut contents = String::new();
-        File::open(&path).unwrap().read_to_string(&mut contents).unwrap();
+        File::open(&path)
+            .unwrap()
+            .read_to_string(&mut contents)
+            .unwrap();
         let lines: Vec<serde_json::Value> = contents
             .lines()
             .filter(|l| !l.trim().is_empty())

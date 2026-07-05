@@ -5,7 +5,7 @@
 //! [`verify_chain`] replays the chain and reports the first break.
 
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
@@ -121,10 +121,7 @@ pub struct ChainStatus {
 pub fn verify_chain(lines: &[Value]) -> ChainStatus {
     for (i, line) in lines.iter().enumerate() {
         let seq = line.get("seq").and_then(|v| v.as_u64()).unwrap_or(0);
-        let prev_hash = line
-            .get("prev_hash")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let prev_hash = line.get("prev_hash").and_then(|v| v.as_str()).unwrap_or("");
         let hash = line.get("hash").and_then(|v| v.as_str()).unwrap_or("");
 
         // Check prev_hash chains to the previous line's hash.
