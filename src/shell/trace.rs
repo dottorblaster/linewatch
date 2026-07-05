@@ -11,7 +11,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::time::{Duration, Instant};
 
-use socket2::{Domain, Protocol, Socket, SockAddr, Type};
+use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
 // ---------------------------------------------------------------------------
 // Hop type
@@ -77,7 +77,11 @@ async fn icmp_ttl_trace(target: IpAddr, per_hop_timeout: Duration) -> io::Result
             None => {
                 // No receiver socket — just report the target at the end.
                 tokio::time::sleep(per_hop_timeout).await;
-                Hop { ttl, addr: None, rtt: None }
+                Hop {
+                    ttl,
+                    addr: None,
+                    rtt: None,
+                }
             }
         };
 
@@ -108,10 +112,18 @@ fn wait_for_icmp_reply(
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
-            return Hop { ttl, addr: None, rtt: None };
+            return Hop {
+                ttl,
+                addr: None,
+                rtt: None,
+            };
         }
         if sock.set_read_timeout(Some(remaining)).is_err() {
-            return Hop { ttl, addr: None, rtt: None };
+            return Hop {
+                ttl,
+                addr: None,
+                rtt: None,
+            };
         }
 
         match sock.recv_from(&mut buf) {
@@ -175,14 +187,22 @@ fn wait_for_icmp_reply(
                     _ => { /* ignore other ICMP types */ }
                 }
             }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock
-                || e.kind() == io::ErrorKind::TimedOut =>
+            Err(ref e)
+                if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
             {
-                return Hop { ttl, addr: None, rtt: None };
+                return Hop {
+                    ttl,
+                    addr: None,
+                    rtt: None,
+                };
             }
             Err(_) => {
                 // Non-recoverable read error.
-                return Hop { ttl, addr: None, rtt: None };
+                return Hop {
+                    ttl,
+                    addr: None,
+                    rtt: None,
+                };
             }
         }
     }
@@ -192,7 +212,11 @@ fn wait_for_icmp_reply(
 // TCP-TTL traceroute (fallback)
 // ---------------------------------------------------------------------------
 
-async fn tcp_ttl_trace(target: IpAddr, per_hop_timeout: Duration, total_budget: Duration) -> Vec<Hop> {
+async fn tcp_ttl_trace(
+    target: IpAddr,
+    per_hop_timeout: Duration,
+    total_budget: Duration,
+) -> Vec<Hop> {
     // Try to open a raw ICMP receiver so we can see Time-Exceeded messages.
     let icmp_recv = create_icmp_receiver().ok();
     let mut hops: Vec<Hop> = Vec::with_capacity(MAX_HOPS as usize);
@@ -213,8 +237,9 @@ async fn tcp_ttl_trace(target: IpAddr, per_hop_timeout: Duration, total_budget: 
                 // Connection succeeded — target is reachable.
                 (Some(target), Some(send_start.elapsed()))
             }
-            Err(ref e) if e.kind() == io::ErrorKind::ConnectionRefused
-                || e.kind() == io::ErrorKind::ConnectionReset =>
+            Err(ref e)
+                if e.kind() == io::ErrorKind::ConnectionRefused
+                    || e.kind() == io::ErrorKind::ConnectionReset =>
             {
                 // Connection was refused/reset — the target received our
                 // SYN but no service is listening on 443.  That's still the
@@ -308,8 +333,8 @@ fn drain_icmp_time_exceeded(
                 }
                 // Ignore other messages.
             }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock
-                || e.kind() == io::ErrorKind::TimedOut =>
+            Err(ref e)
+                if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
             {
                 return None;
             }
@@ -408,7 +433,11 @@ mod tests {
     async fn trace_unreachable_target() {
         // 10.255.255.1 is in the reserved space — unlikely to be routed.
         // Use a short hop timeout to keep the test fast.
-        let hops = trace(IpAddr::V4(Ipv4Addr::new(10, 255, 255, 1)), Duration::from_secs(1)).await;
+        let hops = trace(
+            IpAddr::V4(Ipv4Addr::new(10, 255, 255, 1)),
+            Duration::from_secs(1),
+        )
+        .await;
         println!("Trace to 10.255.255.1:");
         for h in &hops {
             println!("  ttl={}  addr={:?}  rtt={:?}", h.ttl, h.addr, h.rtt);
