@@ -25,9 +25,10 @@ use crate::core::events::AgcomCategory;
 /// temperature time series).
 /// `dossier` — pre-computed summary (used for outage-event metadata).
 /// `output` — filesystem path for the generated PNG.
+#[allow(dead_code)]
 pub fn render_chart(
     lines: &[Value],
-    dossier: &Dossier,
+    _dossier: &Dossier,
     output: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Register the bundled font.

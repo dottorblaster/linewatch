@@ -61,10 +61,11 @@ pub struct Config {
 }
 
 impl Config {
+    #[allow(clippy::result_large_err)]
     pub fn load() -> Result<Self, figment::Error> {
         Figment::new()
             .merge(Toml::file("linewatch.toml"))
-            .merge(Env::prefixed("LINEWATCH_").ignore(&["_".into()]))
+            .merge(Env::prefixed("LINEWATCH_").ignore(&["_"]))
             .extract()
     }
 }

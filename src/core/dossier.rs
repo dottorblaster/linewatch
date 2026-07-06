@@ -11,7 +11,6 @@ use time::{OffsetDateTime, Time};
 
 use crate::core::chain::{ChainStatus, Record, verify_chain};
 use crate::core::events::{AgcomCategory, OutageEvent};
-use crate::core::types::Status;
 
 // ---------------------------------------------------------------------------
 // Input models
@@ -293,10 +292,10 @@ fn compute_temp_correlation(
                     })
                     .map(|(_, temp)| *temp);
 
-                if let Some(t) = temp {
-                    if t > cfg.temp_threshold {
-                        downtime_above_threshold += segment_dur;
-                    }
+                if let Some(t) = temp
+                    && t > cfg.temp_threshold
+                {
+                    downtime_above_threshold += segment_dur;
                 }
             }
             cursor = band_end;
@@ -359,7 +358,7 @@ mod tests {
     use super::*;
     use crate::core::chain::{Record, RecordChain, compute_hash};
     use crate::core::events::OutageEvent;
-    use crate::core::types::{ProbeOutcome, Status, TargetKind};
+    use crate::core::types::Status;
     use serde_json::json;
     use std::time::Duration as StdDuration;
     use time::macros::datetime;
@@ -553,8 +552,6 @@ mod tests {
             AgcomCategory::CompleteInterruption,
             None,
         ));
-        prev = lines.last().unwrap()["hash"].as_str().unwrap().to_owned();
-        seq += 1;
 
         lines
     }
