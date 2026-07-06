@@ -233,7 +233,7 @@ pub fn render_pdf(
     let pdf_bytes = std::fs::read(output).map_err(|e| {
         genpdf::error::Error::new(
             "cannot read output for hashing",
-            genpdf::error::ErrorKind::IoError(e.into()),
+            genpdf::error::ErrorKind::IoError(e),
         )
     })?;
     let fingerprint = hex::encode(Sha256::digest(&pdf_bytes));

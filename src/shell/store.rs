@@ -71,7 +71,7 @@ impl StoreWriter {
         set_hash(&mut record, &hash);
 
         let line = serde_json::to_string(&record)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(std::io::Error::other)?;
 
         writeln!(self.file, "{}", line)?;
         self.file.sync_all()?;
@@ -83,6 +83,7 @@ impl StoreWriter {
     }
 
     /// Current sequence number (next record's `seq`).
+    #[allow(dead_code)]
     pub fn seq(&self) -> u64 {
         self.seq
     }

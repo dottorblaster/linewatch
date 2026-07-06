@@ -21,7 +21,7 @@ use crate::shell::metrics::Metrics;
 use crate::shell::otlp::OtlpExporter;
 use crate::shell::probe::{default_gateway, dns_check, http_check, icmp_ping, tcp_connect};
 use crate::shell::store::StoreWriter;
-use crate::shell::temp::{TemperatureSource, create_temperature_source};
+use crate::shell::temp::create_temperature_source;
 use crate::shell::trace::trace;
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ pub async fn run(config: Config) -> Result<()> {
         // --- Update Prometheus metrics ---
         for outcome in &outcomes {
             let label = target_label(&outcome.kind);
-            metrics.update_target(&label, outcome);
+            metrics.update_target(label, outcome);
         }
         metrics.update_temp(temp_c);
         metrics.update_status(&status);
@@ -204,7 +204,7 @@ pub async fn run(config: Config) -> Result<()> {
         if let Some(ref otlp) = otlp {
             for outcome in &outcomes {
                 let label = target_label(&outcome.kind);
-                otlp.record_target(&label, outcome);
+                otlp.record_target(label, outcome);
             }
             otlp.record_temp(temp_c);
             otlp.record_status(&status);

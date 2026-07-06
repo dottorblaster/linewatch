@@ -288,7 +288,7 @@ async fn tcp_probe_ttl(target: IpAddr, ttl: u8, per_hop_timeout: Duration) -> io
 
     use tokio::time::timeout as tok_timeout;
     tok_timeout(per_hop_timeout, async move {
-        let _ = tokio_stream.writable().await?;
+        tokio_stream.writable().await?;
         // Check for a pending connection error.
         match tokio_stream.take_error()? {
             None => Ok(()),

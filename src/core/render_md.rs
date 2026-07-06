@@ -7,10 +7,8 @@
 use std::fmt::Write;
 
 use sha2::{Digest, Sha256};
-use std::time::Duration;
-
 use crate::core::chain::Record;
-use crate::core::dossier::{Dossier, IndemnityLine};
+use crate::core::dossier::Dossier;
 use crate::core::events::AgcomCategory;
 
 /// Configuration for the rendered report.
@@ -140,7 +138,7 @@ pub fn render_markdown(dossier: &Dossier, records: &[Record], cfg: &ReportConfig
     }
 
     if dossier.per_event_indemnities.is_empty() {
-        let _ = writeln!(md, concat!("| - | - | - | - | - | - | 0.00 | - |"));
+        let _ = writeln!(md, "| - | - | - | - | - | - | 0.00 | - |\n");
     }
     let _ = writeln!(md);
 
@@ -153,8 +151,8 @@ pub fn render_markdown(dossier: &Dossier, records: &[Record], cfg: &ReportConfig
         .iter()
         .map(|l| l.indemnity)
         .sum();
-    let _ = writeln!(md, concat!("| Metric | Value |"));
-    let _ = writeln!(md, concat!("|--------|-------|"));
+    let _ = writeln!(md, "| Metric | Value |\n");
+    let _ = writeln!(md, "|--------|-------|\n");
     let _ = writeln!(
         md,
         "| Total estimated indemnity | **{:.2}** |",
@@ -184,11 +182,11 @@ pub fn render_markdown(dossier: &Dossier, records: &[Record], cfg: &ReportConfig
                 AgcomCategory::IrregularService => "IrregularService",
             };
             let _ = writeln!(md, "### Event: {} - {}\n", event.started.date(), cat,);
-            let _ = writeln!(md, concat!("| TTL | Address | RTT |"));
-            let _ = writeln!(md, concat!("|-----|---------|-----|"));
+            let _ = writeln!(md, "| TTL | Address | RTT |\n");
+            let _ = writeln!(md, "|-----|---------|-----|\n");
 
             if hops.is_empty() {
-                let _ = writeln!(md, concat!("| - | (no hop data) | - |"));
+                let _ = writeln!(md, "| - | (no hop data) | - |\n");
             } else {
                 had_hops = true;
                 for hop in hops {

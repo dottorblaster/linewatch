@@ -4,8 +4,6 @@ mod core;
 mod shell;
 
 use std::fs;
-use std::path::PathBuf;
-
 use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, Command};
@@ -59,7 +57,7 @@ async fn main() -> Result<()> {
                     println!("{}", md);
                 }
                 "pdf" => {
-                    let chart_path = chart.as_ref().map(|s| std::path::Path::new(s));
+                    let chart_path = chart.as_ref().map(std::path::Path::new);
                     let output = config.data_dir.join("dossier.pdf");
                     shell::render_pdf::render_pdf(&dossier, &records, chart_path, &output)
                         .map_err(|e| anyhow::anyhow!("{}", e))?;
