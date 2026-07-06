@@ -1,68 +1,63 @@
 # linewatch
 
-A small, self-contained Rust network-monitoring daemon that produces three
-**separate, non-overlapping** output layers:
+A Rust network-monitoring daemon. It pings things, keeps a tamper-proof
+event log, and can spit out a report you'd feel OK sending to a customer.
 
-1. **Prometheus / OTLP metrics** for live Grafana viewing.
-2. An **append-only JSONL event log** with an internal **SHA-256 hash chain** —
-   the immutable source of truth.
-3. A **dossier** (Markdown or PDF), a **deterministic pure projection** of
-   the JSONL that re-verifies the chain before emitting and never adds data
-   not derivable from the events.
+Three output layers, intentionally kept separate:
 
-The binary is fully static (`x86_64-unknown-linux-musl`), uses **rustls** for
-TLS (no OpenSSL), and never shells out to `ping`/`curl`/`traceroute` —
-everything is pure-Rust.
+1. **Prometheus / OTLP metrics** — live Grafana fodder.
+2. **Append-only JSONL event log** with a SHA-256 hash chain. Once it's
+   written, you can't quietly mess with it.
+3. **Dossier** (Markdown or PDF) — a pure projection of the event log.
+   Re-verifies the chain every time, never adds data that wasn't in the
+   events.
+
+Fully static binary (`x86_64-unknown-linux-musl`), rustls for TLS, no
+OpenSSL, no shelling out to `ping`/`curl`/`traceroute`.
 
 ---
 
 ## Architecture: functional core / imperative shell
 
-| Layer | Location | Rules |
-|------|----------|-------|
-| **Core** (pure) | `src/core/` | All classification, hysteresis, event coalescing, indemnity math, dossier projection, and chain verification. **No I/O**, unit-tested. |
-| **Shell** (effectful) | `src/shell/` | Sockets, files, clock, signals, HTTP server, Open-Meteo, ICMP raw sockets, OTLP, PDF rendering. |
+Everything that decides, classifies, or computes lives in `src/core/`.
+Zero I/O, unit-tested. Everything that touches the network, filesystem, or
+clock lives in `src/shell/`. The types they share (`Sample`, `Status`,
+`OutageEvent`, `Record`, `Dossier`) are plain enums and structs.
 
-States are modeled as `enum`s, logic is iterator- and `match`-based. The
-core types (`Sample`, `Status`, `OutageEvent`, `Record`, `Dossier`, …) are
-the only data structures shared across the boundary.
+States are enums. Logic is iterators and `match`. No surprises.
 
 ---
 
-## What it monitors
+## What it actually does
 
-On every `interval_secs` cycle the daemon runs **all probes concurrently**:
+Every `interval_secs` it runs all probes concurrently:
 
-| Probe | Module | Backend |
-|-------|--------|---------|
-| Default-gateway ICMP | `shell::probe::icmp_ping` | `surge-ping` (SOCK_DGRAM, raw fallback) |
-| ICMP anchors | `shell::probe::icmp_ping` | `surge-ping` |
-| TCP anchors | `shell::probe::tcp_connect` | `tokio::net::TcpStream` + `tokio::time::timeout` |
-| DNS | `shell::probe::dns_check` | `hickory-resolver` (UDP) |
-| HTTP | `shell::probe::http_check` | `reqwest` + **rustls** |
-| Temperature | `shell::temp` | Open-Meteo API (5-min in-memory cache) or static |
+- **ICMP ping** to the default gateway (detected once at startup from
+  `/proc/net/route`) and any configured ICMP anchors — `surge-ping`
+- **TCP connect** to anchors — `tokio::TcpStream` with timeout
+- **DNS resolution** — `hickory-resolver` over UDP
+- **HTTP check** — `reqwest` with rustls
+- **Temperature** — Open-Meteo API (cached for 5 min) or static value
 
-The default gateway is detected once at start-up by reading
-`/proc/net/route` (no `ip route` shell-out).
-
-When an outage event closes, the daemon runs a **traceroute** with
-`shell::trace::trace` (ICMP-TTL with raw-socket CAP_NET_RAW, falling back
-to TCP-TTL on `target:443`) and stores the hops alongside the outage.
+When an outage closes, it runs a traceroute (ICMP-TTL with raw sockets,
+falls back to TCP-TTL on port 443) and stashes the hops alongside the
+event.
 
 ---
 
 ## Status classification
 
-Implemented in `core::classify::classify` with a **strict precedence**:
+Strict priority, implemented as a single `core::classify::classify`
+function:
 
-1. Default gateway unreachable → `LocalOrPower`
-2. All external anchors (ICMP + TCP) unreachable → `Down`
-3. DNS probe failed → `DnsFail`
-4. HTTP probe failed → `HttpFail`
-5. Any reachable probe exceeds `max_loss_pct` or `max_rtt_ms` → `Degraded`
+1. Gateway unreachable → `LocalOrPower`
+2. Every external anchor unreachable → `Down`
+3. DNS failed → `DnsFail`
+4. HTTP failed → `HttpFail`
+5. Any probe exceeding `max_loss_pct` or `max_rtt_ms` → `Degraded`
 6. Otherwise → `Ok`
 
-`LocalOrPower` and `Ok` are *transparent* to the hysteresis machine: they
+`LocalOrPower` and `Ok` are transparent to the hysteresis machine — they
 reset the bad counter instead of accumulating toward an outage.
 
 ---
@@ -70,28 +65,25 @@ reset the bad counter instead of accumulating toward an outage.
 ## Hysteresis / debounce
 
 `core::events::Machine` is a two-state machine (`Idle`, `Open`) driven by
-`open_after` and `close_after` from the config:
+`open_after` and `close_after`:
 
-- A non-Ok/non-`LocalOrPower` sample increments `bad_count`. When it
-  reaches `open_after`, the streak opens an event and `Machine::advance`
-  records the `worst_status`, `min_temp_c`, and `samples_count`.
-- An `Ok` sample increments `close_count`. When it reaches `close_after`
-  the event **closes** and the function returns an `OutageEvent`.
-- Any other status during an open event **resets** `close_count` and may
-  escalate `worst_status`. Severity ranking: `Down > DnsFail > HttpFail > Degraded`.
-- `Machine::force_close` is called on graceful shutdown to emit any
-  in-flight event with the current timestamp.
+- A non-Ok, non-`LocalOrPower` sample increments `bad_count`. When it hits
+  `open_after`, an event opens.
+- An `Ok` sample increments `close_count`. When it hits `close_after`, the
+  event closes and `Machine::advance` returns an `OutageEvent`.
+- Any other status during an open event resets `close_count` and may
+  escalate `worst_status` (ranking: `Down > DnsFail > HttpFail > Degraded`).
+- `Machine::force_close` exists for graceful shutdown — emits whatever's
+  in-flight with the current timestamp.
 
-`OutageEvent` carries an `AgcomCategory`:
-
-- `CompleteInterruption` — at least one `Down` sample was seen
-- `IrregularService` — only `Degraded` / `DnsFail` / `HttpFail`
+`OutageEvent` carries an `AgcomCategory`: `CompleteInterruption` if any
+`Down` sample was seen, `IrregularService` otherwise.
 
 ---
 
 ## The hash chain
 
-Every record on disk is a JSON object with three chain fields:
+Every line in the JSONL log is a record with three chain fields:
 
 ```json
 {
@@ -103,63 +95,52 @@ Every record on disk is a JSON object with three chain fields:
 }
 ```
 
-Canonical-JSON normalisation (recursive key sort via `BTreeMap`) makes the
-hash deterministic regardless of map insertion order.
+Canonical JSON (recursive key sort via `BTreeMap`) makes the hash
+deterministic. `shell::store::StoreWriter` opens the log in append mode,
+recovers the last `(seq, prev_hash)` from disk, writes a `MonitorRestart`
+marker on open, and `fsync`s after every line. The hash is computed from
+the body with the `hash` field zeroed, so the stored value can be
+re-verified by `core::chain::verify_chain`.
 
-`shell::store::StoreWriter`:
-
-- Opens the log in **append** mode
-- Recovers the last `(seq, prev_hash)` from the last line on disk
-- Writes a `MonitorRestart` marker immediately on open
-- `fsync`s after every line
-- Recomputes the hash from the *body* (with `hash` field zeroed) so the
-  stored value can be re-verified by `core::chain::verify_chain`
-
-A tampered or missing line breaks the chain at the lowest affected `seq`
-and `dossier.project` reports the break in `chain_status`.
+A tampered line breaks the chain at its `seq`, and the dossier reports the
+break instead of silently producing numbers from garbage.
 
 ---
 
 ## The dossier
 
-`core::dossier::project` is a **single pure function** that:
+`core::dossier::project` is one pure function that:
 
-1. Calls `verify_chain` on the input.
+1. Verifies the hash chain.
 2. Parses every line into a `Record`.
-3. Computes, from the events alone:
-   - `days_observed` (first → last timestamp)
-   - `outage_count`, `total_downtime`
-   - `downtime_by_hour_band` — `[00–06, 06–12, 12–18, 18–24]`
-   - `temp_correlation` — downtime within a daytime window, and what share
-     of that downtime occurred above a temperature threshold
-   - `per_event_indemnities` — one line per closed event with a
-     human-readable `formula = max(0, days − repair_window) × daily_rate`
+3. Computes from the events: `days_observed`, `outage_count`,
+   `total_downtime`, `downtime_by_hour_band`, `temp_correlation`, and
+   per-event indemnity math (`max(0, days - repair_window) × daily_rate`).
 
 Two renderers wrap it without adding fields:
 
-- `core::render_md::render_markdown` — Markdown with executive summary,
-  chronological event table, indemnity table, traceroute appendix, and a
-  SHA-256 document fingerprint footer.
-- `shell::render_pdf::render_pdf` — paginated PDF via `genpdf`, embedding
-  the optional chart (PNG) on the first page.
-- `shell::chart::render_chart` — temperature line + shaded outage spans
-  using `plotters` and the bundled `assets/DejaVuSans.ttf` (so `musl` does
-  not need fontconfig).
+- `core::render_md::render_markdown` — Markdown to stdout with executive
+  summary, event table, indemnity table, traceroute appendix, and a SHA-256
+  document fingerprint footer.
+- `shell::render_pdf::render_pdf` — paginated PDF via `genpdf`, optional
+  chart PNG on the first page.
+- `shell::chart::render_chart` — temperature line with outage spans using
+  `plotters` and a bundled `assets/DejaVuSans.ttf` (no fontconfig needed
+  on musl).
 
 ---
 
-## Observability endpoints
+## Metrics
 
-`shell::metrics::Metrics` registers the following on a dedicated axum
-server bound to `0.0.0.0:9980`:
+A dedicated axum server on `0.0.0.0:9980`:
 
-| Route | Purpose |
-|-------|---------|
-| `GET /metrics` | Prometheus text exposition |
-| `GET /healthz` | Liveness — always 200 once the binary is up |
+| Route | What it's for |
+|-------|---------------|
+| `GET /metrics` | Prometheus text |
+| `GET /healthz` | Liveness — 200 when the binary is up |
 | `GET /readyz`  | Readiness — 200 after `mark_ready()` |
 
-Metrics exposed:
+Instruments:
 
 - `linewatch_target_up{target}` — 1/0 gauge
 - `linewatch_target_loss_pct{target}` — gauge
@@ -168,23 +149,20 @@ Metrics exposed:
 - `linewatch_outages_total{category}` — counter
 - `linewatch_status{status_name}` — gauge (mutually exclusive, see `status_to_metric`)
 
-When `otlp_endpoint` is set, `shell::otlp::OtlpExporter` mirrors the same
-instruments to an OTLP/HTTP-protobuf collector every 10 s using
-`opentelemetry-otlp` with the `reqwest-rustls` feature only. When unset,
-no OTLP code path runs at all.
+When `otlp_endpoint` is configured, `shell::otlp::OtlpExporter` mirrors the
+same instruments to an OTLP/HTTP-protobuf collector every 10 s. If it's
+unset the OTLP code path dead-eliminates at build time.
 
 ---
 
 ## Build & run
-
-### Cargo (host build)
 
 ```bash
 cargo build --release
 ./target/release/linewatch run
 ```
 
-### Static musl + `FROM scratch`-friendly image
+For a fully static musl build in Docker:
 
 ```bash
 docker build -t linewatch .
@@ -193,18 +171,13 @@ docker run --rm -p 9980:9980 \
   linewatch run
 ```
 
-The Dockerfile:
+The Dockerfile compiles against `rust:alpine`, strips the binary, runs as
+non-root, grants `cap_net_raw+ep` (needed for raw-ICMP traceroute; the
+unprivileged SOCK_DGRAM ping path works without it), and installs a default
+`linewatch.toml` at `/etc/linewatch/linewatch.toml`.
 
-- Compiles with `rust:alpine` for `x86_64-unknown-linux-musl`
-- Strips the binary
-- Runs as a non-root user `linewatch` (uid 1000)
-- Grants `cap_net_raw+ep` on the binary (needed for raw-ICMP fallback in
-  the traceroute; the unprivileged SOCK_DGRAM path needs no caps)
-- Exposes `9980` for the metrics endpoints
-- Installs a default `linewatch.toml` at `/etc/linewatch/linewatch.toml`
-
-If your kernel restricts `net.ipv4.ping_group_range`, you can either pass
-`--cap-add=NET_RAW` or relax the sysctl before running:
+If your kernel restricts `net.ipv4.ping_group_range`, either pass
+`--cap-add=NET_RAW` to Docker or relax the sysctl:
 
 ```bash
 sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
@@ -214,8 +187,7 @@ sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
 
 ## Configuration
 
-Loaded via `figment` from `linewatch.toml` with environment overrides
-prefixed `LINEWATCH_`. Example (`linewatch.toml`):
+TOML with environment overrides prefixed `LINEWATCH_`. Minimal example:
 
 ```toml
 interval_secs = 5
@@ -237,37 +209,36 @@ open_after  = 3
 close_after = 3
 
 [temp]
-source = "open-meteo"   # or "static"
+source = "open-meteo"
 lat = 41.77
 lon = 12.66
-# static_c = 22.0
+# static_c = 22.0   # uncomment for a fixed temperature
 
-# Optional OTLP endpoint. When unset, no OTLP code runs.
 # otlp_endpoint = "http://localhost:4318/v1/metrics"
 ```
 
-Equivalent env-var override example:
+Environment example:
 
 ```bash
 LINEWATCH_INTERVAL_SECS=10 \
 LINEWATCH_TARGETS__HTTP_URL=https://example.com/health \
 LINEWATCH_OTLP_ENDPOINT=http://collector:4318/v1/metrics \
-./target/release/linewatch run
+linewatch run
 ```
 
 ---
 
 ## Commands
 
-| Command | Purpose |
-|---------|---------|
-| `linewatch run` | Start the monitoring daemon (the container default). |
-| `linewatch report --format md [--chart chart.png]` | Project `events.jsonl` into a Markdown dossier on stdout. |
-| `linewatch report --format pdf [--chart chart.png]` | Project into a PDF written to `<data_dir>/dossier.pdf`. |
+| Command | What it does |
+|---------|--------------|
+| `linewatch run` | Start the daemon. |
+| `linewatch report --format md [--chart chart.png]` | Dump a Markdown dossier to stdout. |
+| `linewatch report --format pdf [--chart chart.png]` | Write a PDF dossier. |
 
-The `report` subcommand always re-verifies the hash chain before computing
-anything, so a broken chain is reported in the dossier's *Chain Integrity*
-section and never silently produces numbers from tampered data.
+The `report` subcommand re-verifies the hash chain every time. If the
+chain is broken, it says so in the *Chain Integrity* section and continues
+— you get a report, but it tells you something's wrong.
 
 ---
 
@@ -277,64 +248,16 @@ section and never silently produces numbers from tampered data.
 cargo test --bin linewatch
 ```
 
-58 tests across the workspace cover:
+About 60-odd tests covering: hash-chain round-trip and tamper detection,
+status classification precedence, hysteresis (blips, sustained down,
+escalation, flapping, multiple events, min-temp tracking), dossier
+projection on a multi-day fixture, indemnity repair-window zeroing,
+broken-chain reporting, Markdown and PDF rendering, Prometheus metrics,
+Open-Meteo caching, live network probes against public endpoints, gateway
+detection, and traceroute to loopback / public / unreachable targets.
 
-- Hash-chain round-trip, tamper detection on hash, `prev_hash`, and
-  middle-record fields (`core::chain`, `shell::store`)
-- Status classification precedence (`core::classify`)
-- Hysteresis: single blips, sustained down, escalation, flapping,
-  multiple events, min-temperature tracking (`core::events`)
-- Dossier projection on a multi-day fixture, indemnity repair-window
-  zeroing, broken-chain reporting (`core::dossier`)
-- Markdown and PDF rendering on the same fixture (`core::render_md`,
-  `shell::render_pdf`, `shell::chart`)
-- Prometheus metric updates, exclusive status gauge, outage counter
-  (`shell::metrics`)
-- Open-Meteo caching, static fallback, factory routing (`shell::temp`)
-- Live network probes against public endpoints (TCP/HTTP/DNS/ICMP),
-  `default_gateway` reading, traceroute to loopback / public /
-  unreachable targets (`shell::probe`, `shell::trace`)
-
-The live network tests are best-effort: they print diagnostics and skip
-assertions when the environment cannot reach the targets.
-
----
-
-## Project layout
-
-```
-linewatch/
-├── AGENTS.md              # development rules (architecture, constraints)
-├── Cargo.toml             # deps — all added with `cargo add`
-├── Dockerfile             # musl static build, alpine runtime
-├── LICENSE                # Apache-2.0
-├── linewatch.toml         # default config
-├── assets/
-│   └── DejaVuSans.ttf     # bundled font, embedded with include_bytes!
-└── src/
-    ├── main.rs            # clap entry, dispatches run / report
-    ├── cli.rs             # Command enum
-    ├── config.rs          # figment TOML+env loader
-    ├── core/              # ── pure, no I/O ──
-    │   ├── mod.rs
-    │   ├── types.rs       # Sample, ProbeOutcome, Status, TargetKind, Thresholds
-    │   ├── chain.rs       # Record, RecordChain, compute_hash, verify_chain
-    │   ├── classify.rs    # pure status classification
-    │   ├── events.rs      # Machine (hysteresis), OutageEvent, AgcomCategory
-    │   ├── dossier.rs     # project() and indemnity math
-    │   └── render_md.rs   # Markdown dossier renderer
-    └── shell/             # ── I/O, sockets, files, clock ──
-        ├── mod.rs
-        ├── run.rs         # main loop, signal handling, graceful shutdown
-        ├── probe.rs       # TCP / ICMP / DNS / HTTP / gateway
-        ├── trace.rs       # ICMP-TTL traceroute w/ TCP fallback
-        ├── temp.rs        # Open-Meteo + Static temperature source
-        ├── store.rs       # append-only hash-chain JSONL writer
-        ├── metrics.rs     # Prometheus registry + axum server
-        ├── otlp.rs        # optional OpenTelemetry OTLP exporter
-        ├── chart.rs       # PNG temperature vs outage timeline
-        └── render_pdf.rs  # PDF dossier via genpdf
-```
+The live-network tests are best-effort — they print diagnostics and skip
+assertions when the environment can't reach the targets.
 
 ---
 
