@@ -293,9 +293,10 @@ fn compute_temp_correlation(
                     .map(|(_, temp)| *temp);
 
                 if let Some(t) = temp
-                    && t > cfg.temp_threshold {
-                        downtime_above_threshold += segment_dur;
-                    }
+                    && t > cfg.temp_threshold
+                {
+                    downtime_above_threshold += segment_dur;
+                }
             }
             cursor = band_end;
         }

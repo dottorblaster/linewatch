@@ -6,10 +6,10 @@
 
 use std::fmt::Write;
 
-use sha2::{Digest, Sha256};
 use crate::core::chain::Record;
 use crate::core::dossier::Dossier;
 use crate::core::events::AgcomCategory;
+use sha2::{Digest, Sha256};
 
 /// Configuration for the rendered report.
 pub struct ReportConfig {

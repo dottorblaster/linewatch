@@ -70,8 +70,7 @@ impl StoreWriter {
         // Inject the computed hash.
         set_hash(&mut record, &hash);
 
-        let line = serde_json::to_string(&record)
-            .map_err(std::io::Error::other)?;
+        let line = serde_json::to_string(&record).map_err(std::io::Error::other)?;
 
         writeln!(self.file, "{}", line)?;
         self.file.sync_all()?;

@@ -3,11 +3,11 @@ mod config;
 mod core;
 mod shell;
 
-use std::fs;
 use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, Command};
 use config::Config;
+use std::fs;
 
 #[tokio::main]
 async fn main() -> Result<()> {

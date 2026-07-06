@@ -79,9 +79,10 @@ impl TemperatureSource for OpenMeteo {
         {
             let guard = self.cache.lock().await;
             if let Some(entry) = guard.as_ref()
-                && entry.fetched_at.elapsed() < CACHE_TTL {
-                    return Some(entry.temp);
-                }
+                && entry.fetched_at.elapsed() < CACHE_TTL
+            {
+                return Some(entry.temp);
+            }
         } // drop lock before the HTTP call
 
         // Fetch fresh data.
@@ -146,9 +147,10 @@ impl TemperatureSource for StaticTemp {
 ///   gracefully at read time if the network is unavailable).
 pub fn create_temperature_source(cfg: &TempCfg) -> Box<dyn TemperatureSource> {
     if cfg.source == "static"
-        && let Some(c) = cfg.static_c {
-            return Box::new(StaticTemp(c));
-        }
+        && let Some(c) = cfg.static_c
+    {
+        return Box::new(StaticTemp(c));
+    }
 
     Box::new(OpenMeteo::new(cfg.lat, cfg.lon))
 }
