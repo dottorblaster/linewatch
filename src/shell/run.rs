@@ -47,7 +47,7 @@ pub async fn run(config: Config) -> Result<()> {
 
     // --- Spawn axum server in background ---
     let metrics_srv = metrics.clone();
-    let metrics_addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 9980);
+    let metrics_addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 9980);
     let metrics_handle = tokio::spawn(async move {
         metrics_srv.serve(metrics_addr).await;
     });
