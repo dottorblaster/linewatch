@@ -105,7 +105,6 @@ pub async fn run(config: Config) -> Result<()> {
 
         // --- Run all probes concurrently ---
         let mut outcomes = Vec::new();
-        let temp_fut = temp_source.read();
 
         // Build probe futures.
         let mut probe_futs: Vec<tokio::task::JoinHandle<ProbeOutcome>> = Vec::new();
@@ -160,20 +159,24 @@ pub async fn run(config: Config) -> Result<()> {
             dns_check(TargetKind::Dns, &upstream, &query, dur).await
         }));
 
-        // --- Wait for all probe futures ---
-        let (probe_results, temp_result) = tokio::join!(join_all(probe_futs), temp_fut,);
-
-        for result in probe_results {
+        // --- Wait for all probe futures, then conditionally fetch temp ---
+        for result in join_all(probe_futs).await {
             match result {
                 Ok(outcome) => outcomes.push(outcome),
                 Err(e) => {
                     eprintln!("[linewatch] probe task panicked: {e}");
-                    // Continue with partial results
                 }
             }
         }
 
-        let temp_c = temp_result;
+        // Only fetch temperature when at least one probe succeeded — pointless
+        // (and misleading for the "temperature is too high" heuristic) when the
+        // connection is already confirmed offline.
+        let temp_c = if outcomes.iter().any(|o| o.reachable) {
+            temp_source.read().await
+        } else {
+            None
+        };
 
         // --- Build the Sample ---
         let sample = Sample {

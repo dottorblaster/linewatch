@@ -19,7 +19,7 @@ close_after = 3
 [temp]
 source = "open-meteo"
 lat = 41.77
-lon = 12.66
+lon = 12.60
 # static_c = 22.0
 
 # Optional OTLP endpoint for exporting metrics via OpenTelemetry.
